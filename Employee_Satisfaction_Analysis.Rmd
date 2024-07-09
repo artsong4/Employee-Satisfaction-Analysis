@@ -13,7 +13,6 @@ library(ggplot2)
 Employement_data <- read_excel("C:/DS/687/Employement_data.xlsx")
 View(Employement_data)
 ```
-summarize the data set
 
 ```{r}
 summary(Employement_data)
