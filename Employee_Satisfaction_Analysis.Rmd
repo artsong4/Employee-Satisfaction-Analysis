@@ -1,0 +1,441 @@
+---
+title: "Employee Satisfaction Analysis"
+author: "Tibaria Al Nouri, Katherine Martinez, James Price, Yesul Song"
+date: "09/14/2023"
+---
+
+```{r}
+library(readxl)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+Employement_data <- read_excel("C:/DS/687/Employement_data.xlsx")
+View(Employement_data)
+```
+summarize the data set
+
+```{r}
+summary(Employement_data)
+str(Employement_data)
+```
+
+```{r}
+
+Employement_data2 <- read_excel("C:/DS/687/Employement_data.xlsx")
+
+colnames(Employement_data2) <- gsub(' ', '_', colnames(Employement_data2))
+
+
+grouped_summary <- Employement_data %>%
+  group_by(State) %>%
+  summarize(mean_yrs_w = mean(`No of Yrs spent in company`))
+grouped_summary
+```
+
+```{r}
+#employees leaving as proportion of department
+```
+
+```{r}  
+# Excluding 'Still Employed' from the reasons for leaving column
+Reasons_Left_Data <- filter(Employement_data2, Reason_for_Leaving != 'Still Employed' & Reason_for_Leaving != 'NA - Still Employed')
+
+# Recoding long reasons to short names
+Reasons_Left_Data$Reason_for_Leaving <-
+  recode(Reasons_Left_Data$Reason_for_Leaving, 
+    "NA - Still Employed" = "Still Employed",
+    "Supervisor Issues" = "Supervisor",
+    "Work Pressure" = "Work Pressure",
+    "Joined Competitor" = "Competitor",
+    "Unfair Promotions" = "Unfair Promos",
+    "Pay Issues" = "Pay",
+    "No Encouragement" = "No Encouragement",
+    "No Career Path" = "No Path",
+    "Work-Life Imbalance" = "Imbalance",
+    "Poor Medical Facilities" = "Poor Med",
+    "No Friends at Work" = "No Friends")
+
+# A high-level look at reasons for leaving
+reason_leaving <- Reasons_Left_Data %>%
+  group_by(Reason_for_Leaving) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count))
+
+print(reason_leaving)
+
+# Plot reason leaving data
+ggplot(reason_leaving, aes(x = Reason_for_Leaving, y = count, fill = Reason_for_Leaving)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Reason for Leaving", y = "Count") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_discrete(name = "Reason")
+```
+
+```{r}
+# Identify unique reasons and recode them
+unique(Employement_data2$Reason_for_Leaving)
+
+Employement_data2$Reason_for_Leaving <-
+  recode(Employement_data2$Reason_for_Leaving, 
+         "NA - Still Employed" = "Still Employed",
+         "Immedieate Supervisor" = "Supervisor Issues",
+         "Unable to cope up with work preassure" = "Work Pressure",
+         "Joining Competetion for Better Prospects" = "Joined Competitor",
+         "Promotion not merit based" = "Unfair Promotions",
+         "Remuneration" = "Pay Issues",
+         "Lack Encouragement" = "No Encouragement",
+         "Lack of Career Path" = "No Career Path",
+         "Lack of Work Life Balance" = "Work-Life Imbalance",
+         "Insuffieicnt Medical facility" = "Poor Medical Facilities",
+         "No friends in the organization" = "No Friends at Work")
+
+# Count how often each reason appears in the dataset
+reason_counts <- Employement_data2 %>%
+  count(Reason_for_Leaving, sort = TRUE)
+
+# Extract the top 4 reasons based on their frequency
+topreasons <- reason_counts %>% 
+  filter(Reason_for_Leaving != "Still Employed") %>%
+  head(4) %>%
+  pull(Reason_for_Leaving)
+
+Top_4_Reasons <- filter(Employement_data2, Reason_for_Leaving %in% topreasons)
+
+# Group the data by 'department' and 'reason_for_leaving' and count the number of people for each reason within each department
+reason_department_counts <- Top_4_Reasons %>%
+  group_by(Department, Reason_for_Leaving) %>%
+  summarize(count = n(), .groups = 'drop')
+
+# Extract top 4 departments based on the count of people leaving for top 4 reasons
+top_departments <- reason_department_counts %>%
+  group_by(Department) %>%
+  summarise(total_left = sum(count)) %>%
+  arrange(-total_left) %>%
+  head(4) %>%
+  pull(Department)
+
+# Filter reason_department_counts to only include those top 4 departments
+reason_department_counts_filtered <- filter(reason_department_counts, Department %in% top_departments)
+
+# Create a grouped bar plot to visualize the counts for top 4 departments
+ggplot(reason_department_counts_filtered, aes(x = Reason_for_Leaving, y = count, fill = Department)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(
+    title = "Reasons for Leaving by Department (Top 4)",
+    x = "Reason for Leaving", y = "Count") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_discrete(name = "Department") +
+  facet_wrap(~Department, scales = "free_x")
+
+
+
+```
+
+```{r}
+average_satisfaction <- Employement_data %>%
+  group_by(Department, `Employee Status`) %>%
+  summarize(avg_satisfaction = mean(`Employee Satisfaction score(Latest)`), .groups = "drop")
+
+
+ggplot(average_satisfaction, aes(x = reorder(Department, -avg_satisfaction), y = avg_satisfaction, fill = `Employee Status`)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(x = "Department", y = "Average Satisfaction Score", title = "Average Satisfaction Score by Department and Status") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+
+```{r}
+ordered_data <- Employement_data %>%
+  group_by(Department, `Salary bracket`) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  arrange(Department, desc(n))
+
+ordered_data$`Salary bracket` <- factor(ordered_data$`Salary bracket`, levels = c("low", "medium", "high"))
+ordered_data$Department <- factor(ordered_data$Department)
+
+salary_bracket_colors <- c("high" = "green", "medium" = "yellow", "low" = "red")
+
+ggplot(ordered_data, aes(x = Department, y = n, fill = `Salary bracket`)) +
+  geom_bar(stat = "identity", position = "stack") +
+  geom_text(aes(label = n), position = position_stack(vjust = 0.5), color = "black", size = 3) +  # Adding labels
+  labs(x = "Department", y = "Count", title = "Employee Count by Salary Bracket and Department") +
+  scale_fill_manual(values = salary_bracket_colors, guide = FALSE) +  # Use the defined colors and hide the legend
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(ordered_data, aes(x = Department, y = n, fill = `Salary bracket`)) +
+  geom_bar(stat = "identity", position = "stack") +
+  geom_text(aes(label = n), position = position_stack(vjust = 0.5), color = "black", size = 3) +  # Adding labels
+  labs(x = "Department", y = "Count", title = "Employee Count by Salary Bracket and Department") +
+  scale_fill_manual(values = salary_bracket_colors, guide = FALSE) +  # Use the defined colors and hide the legend
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+```{r}
+low_salary_data <- Employement_data %>%
+  filter(`Salary bracket` == "low")
+low_salary_data <- low_salary_data %>%
+  mutate(`Salary bracket` = as.numeric(gsub("[^0-9.]", "", `Salary bracket`)))
+grouped_summary <- low_salary_data %>%
+  group_by(State) %>%
+  summarize(mean_age = mean(`No of Yrs spent in company`),
+            median_salary = median(`Salary bracket`, na.rm = TRUE))
+print(grouped_summary)
+
+
+```
+```{r}
+low_salary_data <- Employement_data %>%
+  filter(`Salary bracket` == "low")
+avg_satisfaction_low <- low_salary_data %>%
+  group_by(Department) %>%
+  summarize(avg_satisfaction = mean(`Employee Satisfaction score(Latest)`))
+ggplot(avg_satisfaction_low, aes(x = reorder(Department, avg_satisfaction), y = avg_satisfaction, fill = "Low")) +
+  geom_bar(stat = "identity") +
+  labs(x = "Department", y = "Average Satisfaction Score",
+       title = "Employee Satisfaction Breakdown for 'Low' Salary Bracket") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(values = c("Low" = "green")) +
+  theme(legend.title = element_blank(), legend.position = "none")
+
+
+```
+```{r}
+medium_salary_data <- Employement_data %>%
+  filter(`Salary bracket` == "medium")
+avg_satisfaction_medium <- medium_salary_data %>%
+  group_by(Department) %>%
+  summarize(avg_satisfaction = mean(`Employee Satisfaction score(Latest)`))
+ggplot(avg_satisfaction_medium, aes(x = reorder(Department, avg_satisfaction), y = avg_satisfaction, fill = "Medium")) +
+  geom_bar(stat = "identity") +
+  labs(x = "Department", y = "Average Satisfaction Score",
+       title = "Employee Satisfaction Breakdown for 'Medium' Salary Bracket") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(values = c("Medium" = "yellow")) +
+  theme(legend.title = element_blank(), legend.position = "none")  
+
+```
+
+```{r}
+high_salary_data <- Employement_data %>%
+  filter(`Salary bracket` == "high")
+avg_satisfaction_high <- high_salary_data %>%
+  group_by(Department) %>%
+  summarize(avg_satisfaction = mean(`Employee Satisfaction score(Latest)`))
+ggplot(avg_satisfaction_high, aes(x = reorder(Department, avg_satisfaction), y = avg_satisfaction, fill = "High")) +
+  geom_bar(stat = "identity") +
+  labs(x = "Department", y = "Average Satisfaction Score",
+       title = "Employee Satisfaction Breakdown for 'High' Salary Bracket") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(values = c("High" = "red")) +
+  theme(legend.title = element_blank(), legend.position = "none")
+
+```
+
+
+
+```{r}
+projects_3_or_less <- Employement_data %>%
+  filter(`Number of Projects undertaken` <= 3)
+
+avg_satisfaction_3_or_less <- projects_3_or_less %>%
+  group_by(`Employee Status`) %>%
+  summarize(avg_satisfaction = mean(`Employee Satisfaction score(Latest)`), .groups = "drop")
+
+ggplot(avg_satisfaction_3_or_less, aes(x = `Employee Status`, y = avg_satisfaction, fill = `Employee Status`)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Employee Status", y = "Average Satisfaction Score",
+       title = "Employee Satisfaction for Employees with 3 or Fewer Projects") +
+  theme(legend.title = element_blank())
+
+
+```
+
+```{r}
+projects_2_3 <- Employement_data %>%
+  filter(`Number of Projects undertaken` >= 2 & `Number of Projects undertaken` <= 3)
+
+avg_satisfaction_2_3 <- projects_2_3 %>%
+  group_by(Department, `Employee Status`) %>%
+  summarize(avg_satisfaction = mean(`Employee Satisfaction score(Latest)`), .groups = "drop")
+
+ggplot(avg_satisfaction_2_3, aes(x = reorder(Department, avg_satisfaction), y = avg_satisfaction, fill = `Employee Status`)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Department", y = "Average Satisfaction Score",
+       title = "Employee Satisfaction Breakdown for Employees with 2-3 Projects") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+projects_4_5 <- Employement_data %>%
+  filter(`Number of Projects undertaken` >= 4 & `Number of Projects undertaken` <= 5)
+
+avg_satisfaction_4_5 <- projects_4_5 %>%
+  group_by(Department, `Employee Status`) %>%
+  summarize(avg_satisfaction = mean(`Employee Satisfaction score(Latest)`), .groups = "drop")
+
+ggplot(avg_satisfaction_4_5, aes(x = reorder(Department, avg_satisfaction), y = avg_satisfaction, fill = `Employee Status`)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Department", y = "Average Satisfaction Score",
+       title = "Employee Satisfaction Breakdown for Employees with 4-5 Projects") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+projects_6_plus <- Employement_data %>%
+  filter(`Number of Projects undertaken` >= 6)
+
+avg_satisfaction_6_plus <- projects_6_plus %>%
+  group_by(Department, `Employee Status`, .groups = "drop") %>%
+  summarize(avg_satisfaction = mean(`Employee Satisfaction score(Latest)`), .groups = "drop")
+
+ggplot(avg_satisfaction_6_plus, aes(x = reorder(Department, avg_satisfaction), y = avg_satisfaction, fill = `Employee Status`)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Department", y = "Average Satisfaction Score",
+       title = "Employee Satisfaction Breakdown for Employees with 6+ Projects") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+# Perform multiple linear regression analysis
+regression_model <- lm(`Employee Satisfaction score(Latest)` ~ `Number of Projects undertaken` + `Monthly work hours` + `No of Yrs spent in company` + `Salary bracket`, data = Employement_data)
+
+# Print the regression summary
+summary(regression_model)
+
+```
+
+```{r}
+library(corrplot)
+columns_to_include <- c("Employee Satisfaction score (Prior)", "Employee Satisfaction score(Latest)", "Monthly work hours", "No of Yrs spent in company", "Number of Projects undertaken")
+for (col in columns_to_include) {
+  Employement_data[[col]] <- as.numeric(Employement_data[[col]])
+}
+correlation_data <- Employement_data[complete.cases(Employement_data[, columns_to_include]), ]
+correlation_matrix <- cor(correlation_data[, columns_to_include], use = "pairwise.complete.obs")
+print(correlation_matrix)
+corrplot(correlation_matrix, method = "circle")
+
+```
+
+```{r}
+# Scatter plot for employees currently with the organization
+ggplot(subset(Employement_data, `Employee Status` == "Currently with organization"),
+       aes(x = `Monthly work hours`, y = `Employee Satisfaction score(Latest)`)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(x = "Monthly Work Hours", y = "Employee Satisfaction Score",
+       title = "Employee Satisfaction vs. Monthly Work Hours (Currently with Organization)") +
+  theme_minimal()
+
+
+```
+
+```{r}
+# Scatter plot for employees who left the organization
+ggplot(subset(Employement_data, `Employee Status` == "Left the organization"),
+       aes(x = `Monthly work hours`, y = `Employee Satisfaction score(Latest)`)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(x = "Monthly Work Hours", y = "Employee Satisfaction Score",
+       title = "Employee Satisfaction vs. Monthly Work Hours (Left Organization)") +
+  theme_minimal()
+
+```
+
+```{r}
+# Create a stacked bar chart of employee satisfaction based on years with company and employee status
+ggplot(Employement_data, aes(x = factor(`No of Yrs spent in company`), fill = `Employee Status`)) +
+  geom_bar(position = "stack", aes(y = `Employee Satisfaction score(Latest)`), stat = "summary", fun = "mean") +
+  labs(x = "Number of Years with Company", y = "Average Employee Satisfaction Score",
+       title = "Employee Satisfaction by Years with Company and Status") +
+  theme_minimal()
+
+```
+
+
+```{r}
+library(rnaturalearth)
+library(rnaturalearthhires) # Make sure you install the library
+
+# Sample data with average employee satisfaction scores by country
+average_satisfaction <- data.frame(
+  Country = c("Germany", "United Kingdom", "France", "Netherlands", "Spain", "Germany", "Finland", "Ireland", "Portugal"),  # Example country values
+  Average_Satisfaction = c(0.75, 0.82, 0.68, 0.93, 0.56, 0.87, 0.76, 0.61, 0.89)  # Example average satisfaction scores
+)
+
+# Get a detailed map of Europe
+europe <- ne_countries(scale = "large", continent = "Europe", returnclass = "sf")
+
+# List of countries to include
+countries_to_include <- c("Austria", "Belgium", "Denmark", "Norway", "Switzerland", "Italy", "United Kingdom", "France", "Netherlands", "Spain", "Germany", "Finland", "Ireland", "Portugal")
+
+# Subset the map to include only selected countries
+selected_countries <- europe[europe$name %in% countries_to_include, ]
+
+# Merge average satisfaction data with selected_countries data
+average_satisfaction_map <- merge(selected_countries, average_satisfaction, by.x = "name", by.y = "Country", all.x = TRUE)
+
+# Plot the density map of average satisfaction
+ggplot(average_satisfaction_map) +
+  geom_sf(aes(fill = Average_Satisfaction)) +
+  scale_fill_gradient(low = "lightblue", high = "darkblue") +  # Adjust gradient colors here 
+  labs(title = "Average Employee Satisfaction Density Map") +
+  theme_void()
+
+```
+```{r}
+# Assuming you have a dataset named Employement_data
+
+# Filter the data for employees who have been promoted
+promoted <- Employement_data %>%
+  filter(`Promotion in the last 5 yrs` == "Promoted")
+
+# Filter the data for employees who have not been promoted
+not_promoted <- Employement_data %>%
+  filter(`Promotion in the last 5 yrs` == "Not promoted")
+
+# Calculate the average satisfaction score for promoted employees
+avg_satisfaction_promoted <- mean(promoted$`Employee Satisfaction score(Latest)`, na.rm = TRUE)
+
+# Calculate the average satisfaction score for not promoted employees
+avg_satisfaction_not_promoted <- mean(not_promoted$`Employee Satisfaction score(Latest)`, na.rm = TRUE)
+
+# Create a data frame for the scatter plot
+satisfaction_data <- data.frame(
+  Category = c("Promoted", "Not Promoted"),
+  Average_Satisfaction = c(avg_satisfaction_promoted, avg_satisfaction_not_promoted)
+)
+
+# Create a scatter plot
+ggplot(data = satisfaction_data, aes(x = Category, y = Average_Satisfaction)) +
+  geom_point(size = 3) +
+  labs(x = "Promotion Status", y = "Average Employee Satisfaction Score",
+       title = "Average Employee Satisfaction by Promotion Status")
+
+```
+```{r}
+# Create a histogram with custom colors
+ggplot(data = Employement_data, aes(x = `Employee Satisfaction score(Latest)`)) +
+  geom_histogram(aes(fill = `Promotion in the last 5 yrs`), bins = 20, color = "black") +
+  labs(x = "Employee Satisfaction Score", y = "Frequency",
+       title = "Employee Satisfaction Histogram by Promotion Status") +
+  scale_fill_manual(values = c("Promoted" = "green", "Not promoted" = "red")) +  # Custom colors
+  theme_minimal()
+```
+```{r}
+# Create a histogram with custom colors
+ggplot(data = Employement_data, aes(x = `Employee Satisfaction score(Latest)`)) +
+  geom_histogram(aes(fill = `Work @ accident`), bins = 20, color = "black") +
+  labs(x = "Employee Satisfaction Score", y = "Frequency",
+       title = "Employee Satisfaction Histogram by On-the-Job Injury Status") +
+  scale_fill_manual(values = c("No" = "green", "Yes" = "red")) +  # Custom colors
+  theme_minimal()
+```
+
