@@ -1,3 +1,9 @@
+---
+title: "Employee Satisfaction Analysis"
+author: "Tibaria Al Nouri, Katherine Martinez, James Price, Yesul Song"
+date: "09/14/2023"
+---
+
 ```{r}
 library(readxl)
 library(dplyr)
