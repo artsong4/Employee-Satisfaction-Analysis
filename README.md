@@ -181,5 +181,6 @@ Employee-Satisfaction-Analysis/
 ├── data/
 │   ├── Employment_data.xlsx
 ├── Employee_Satisfaction_Analysis.Rmd
+├── Employee_Satisfaction_Analysis_report.docx
 ├── README.md
 ├── LICENSE
